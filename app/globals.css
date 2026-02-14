@@ -588,6 +588,93 @@ h1,
   color: var(--primary-deep);
 }
 
+/* Spacing polish for composer/feed */
+.hub-stack {
+  display: grid;
+  gap: 18px;
+}
+
+.panel-head {
+  display: grid;
+  gap: 6px;
+}
+
+.panel-head .eyebrow {
+  margin-bottom: 0;
+}
+
+.panel-head .subtitle {
+  margin-top: 4px;
+}
+
+.panel .section-title {
+  font-size: clamp(1.24rem, 2.5vw, 1.82rem);
+  line-height: 1.16;
+}
+
+.composer-panel,
+.feed-panel,
+.compact-info {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 0;
+}
+
+.composer-input {
+  padding: 14px 15px;
+  min-height: 124px;
+  font-size: 0.96rem;
+  line-height: 1.55;
+}
+
+.composer-input::placeholder {
+  color: rgba(51, 65, 85, 0.72);
+}
+
+.mood-list {
+  margin: 0;
+  gap: 10px;
+}
+
+.composer-foot {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.composer-submit {
+  margin-top: 0;
+}
+
+.feed {
+  gap: 14px;
+}
+
+.post-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.post-head {
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
+  row-gap: 6px;
+}
+
+.post-text {
+  margin: 0;
+}
+
+.reaction-list {
+  gap: 10px;
+}
+
+.reaction-button {
+  padding: 9px 12px;
+  line-height: 1.2;
+}
+
 @keyframes reveal {
   from {
     opacity: 0;
@@ -619,6 +706,30 @@ h1,
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+@media (max-width: 680px) {
+  .main-shell {
+    padding: 20px 14px 64px;
+  }
+
+  .panel {
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .composer-foot {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .composer-submit {
+    width: 100%;
+  }
+
+  .post-card {
+    padding: 14px;
   }
 }
 

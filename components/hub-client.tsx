@@ -263,10 +263,12 @@ export function HubClient() {
 
   return (
     <section className="layout-grid layout-single">
-      <div>
+      <div className="hub-stack">
         <div id="composer" className="panel composer-panel">
-          <p className="eyebrow">Anonymous post {icon.write}</p>
-          <h2 className="section-title">{icon.write} Tumpahin unek-unek kamu</h2>
+          <div className="panel-head">
+            <p className="eyebrow">Anonymous post {icon.write}</p>
+            <h2 className="section-title">{icon.write} Tumpahin unek-unek kamu</h2>
+          </div>
 
           <textarea
             className="composer-input"
@@ -292,7 +294,7 @@ export function HubClient() {
 
           <div className="composer-foot">
             <span className="char-counter">{text.length}/420</span>
-            <button className="cta-button" type="button" onClick={handleSubmit}>
+            <button className="cta-button composer-submit" type="button" onClick={handleSubmit}>
               {icon.rocket} Kirim curhat
             </button>
           </div>
@@ -310,10 +312,12 @@ export function HubClient() {
           </p>
         </div>
 
-        <div className="panel">
-          <p className="eyebrow">Feed cerita {icon.feed}</p>
-          <h2 className="section-title">{icon.megaphone} Cerita terbaru</h2>
-          <p className="subtitle">Dukungan cepat, tanpa drama.</p>
+        <div className="panel feed-panel">
+          <div className="panel-head">
+            <p className="eyebrow">Feed cerita {icon.feed}</p>
+            <h2 className="section-title">{icon.megaphone} Cerita terbaru</h2>
+            <p className="subtitle">Dukungan cepat, tanpa drama.</p>
+          </div>
 
           <div className="feed">
             {posts.map((post) => {
