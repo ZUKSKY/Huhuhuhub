@@ -1,32 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-
-type Mood = "capek" | "kesel" | "cemas" | "sedih" | "izin" | "random";
-
-type ReactionKey = "hug" | "semangat" | "gakSendiri" | "izin";
-
-type Post = {
-  id: string;
-  text: string;
-  mood: Mood;
-  createdAt: number;
-  reports: number;
-  reactions: Record<ReactionKey, number>;
-};
-
-type StoredPost = Omit<Post, "reactions"> & {
-  reactions?: Partial<Record<ReactionKey, number>>;
-};
-
-type ReactionHistory = Record<string, ReactionKey>;
-type ReportUsage = Record<string, true>;
-
-const STORAGE_KEY = "huhuhuhub.feed.v1";
-const REACTION_STORAGE_KEY = "huhuhuhub.feed.reactions.v1";
-const REPORT_STORAGE_KEY = "huhuhuhub.feed.reports.v1";
-
-const reactionKeys: ReactionKey[] = ["hug", "semangat", "gakSendiri", "izin"];
+import {
+  isMood,
+  moodValues,
+  reactionValues,
+  type FeedResponse,
+  type Mood,
+  type Post,
+  type ReactionHistory,
+  type ReactionKey,
+  type ReportUsage,
+} from "@/lib/hub-types";
 
 const icon = {
   capek: "\u{1F62E}",
@@ -52,35 +37,16 @@ const moodLabel: Record<Mood, string> = {
   kesel: `${icon.kesel} Kesel`,
   cemas: `${icon.cemas} Cemas`,
   sedih: `${icon.sedih} Sedih`,
-  izin: `${icon.izin} Izin`,
-  random: `${icon.random} Random`,
+  izin: `${icon.izin} Izin dulu`,
+  random: `${icon.random} Random aja`,
 };
 
 const reactionLabel: Record<ReactionKey, string> = {
-  hug: `${icon.hug} Peluk virtual`,
-  semangat: `${icon.semangat} Semangat`,
+  hug: `${icon.hug} Peluk online`,
+  semangat: `${icon.semangat} Semangatin`,
   gakSendiri: `${icon.gakSendiri} egiluy`,
-  izin: `${icon.izin} Izin`,
+  izin: `${icon.izin} Izin dulu`,
 };
-
-const defaultPosts: Post[] = [
-  {
-    id: "seed-1",
-    text: "Kerjaan numpuk, laptop lemot, hujan deras. Paket kombo hari ini.",
-    mood: "capek",
-    createdAt: Date.now() - 1000 * 60 * 47,
-    reports: 0,
-    reactions: { hug: 12, semangat: 4, gakSendiri: 8, izin: 3 },
-  },
-  {
-    id: "seed-2",
-    text: "Udah effort banget, tapi masih dibilang kurang. Boleh nangis tipis dulu ga?",
-    mood: "sedih",
-    createdAt: Date.now() - 1000 * 60 * 122,
-    reports: 0,
-    reactions: { hug: 20, semangat: 15, gakSendiri: 18, izin: 5 },
-  },
-];
 
 function formatTime(timestamp: number): string {
   return new Intl.DateTimeFormat("id-ID", {
@@ -91,60 +57,21 @@ function formatTime(timestamp: number): string {
   }).format(new Date(timestamp));
 }
 
-function normalizePost(post: StoredPost): Post {
-  return {
-    ...post,
-    reactions: {
-      hug: Number(post.reactions?.hug ?? 0),
-      semangat: Number(post.reactions?.semangat ?? 0),
-      gakSendiri: Number(post.reactions?.gakSendiri ?? 0),
-      izin: Number(post.reactions?.izin ?? 0),
-    },
-  };
-}
+async function readErrorMessage(
+  response: Response,
+  fallbackMessage: string,
+): Promise<string> {
+  try {
+    const body = (await response.json()) as { error?: unknown };
 
-function isReactionKey(value: unknown): value is ReactionKey {
-  return typeof value === "string" && reactionKeys.includes(value as ReactionKey);
-}
-
-function normalizeReactionHistory(raw: unknown): ReactionHistory {
-  if (!raw || typeof raw !== "object") return {};
-
-  const source = raw as Record<string, unknown>;
-  const normalized: ReactionHistory = {};
-
-  Object.entries(source).forEach(([postId, entry]) => {
-    if (isReactionKey(entry)) {
-      normalized[postId] = entry;
-      return;
+    if (typeof body.error === "string" && body.error.length > 0) {
+      return body.error;
     }
+  } catch {
+    return fallbackMessage;
+  }
 
-    if (!entry || typeof entry !== "object") return;
-
-    const flags = entry as Record<string, unknown>;
-    const picked = reactionKeys.find((key) => Boolean(flags[key]));
-
-    if (picked) {
-      normalized[postId] = picked;
-    }
-  });
-
-  return normalized;
-}
-
-function normalizeReportUsage(raw: unknown): ReportUsage {
-  if (!raw || typeof raw !== "object") return {};
-
-  const source = raw as Record<string, unknown>;
-  const normalized: ReportUsage = {};
-
-  Object.entries(source).forEach(([postId, value]) => {
-    if (Boolean(value)) {
-      normalized[postId] = true;
-    }
-  });
-
-  return normalized;
+  return fallbackMessage;
 }
 
 export function HubClient() {
@@ -153,112 +80,185 @@ export function HubClient() {
   const [mood, setMood] = useState<Mood>("random");
   const [reactedMap, setReactedMap] = useState<ReactionHistory>({});
   const [reportedMap, setReportedMap] = useState<ReportUsage>({});
-
-  useEffect(() => {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    const rawReactions = window.localStorage.getItem(REACTION_STORAGE_KEY);
-    const rawReports = window.localStorage.getItem(REPORT_STORAGE_KEY);
-
-    if (rawReactions) {
-      try {
-        setReactedMap(normalizeReactionHistory(JSON.parse(rawReactions)));
-      } catch {
-        setReactedMap({});
-      }
-    }
-
-    if (rawReports) {
-      try {
-        setReportedMap(normalizeReportUsage(JSON.parse(rawReports)));
-      } catch {
-        setReportedMap({});
-      }
-    }
-
-    if (!raw) {
-      setPosts(defaultPosts);
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultPosts));
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(raw) as StoredPost[];
-      const safePosts = parsed.map(normalizePost);
-      setPosts(safePosts.length > 0 ? safePosts : defaultPosts);
-    } catch {
-      setPosts(defaultPosts);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (posts.length === 0) return;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(posts));
-  }, [posts]);
-
-  useEffect(() => {
-    window.localStorage.setItem(REACTION_STORAGE_KEY, JSON.stringify(reactedMap));
-  }, [reactedMap]);
-
-  useEffect(() => {
-    window.localStorage.setItem(REPORT_STORAGE_KEY, JSON.stringify(reportedMap));
-  }, [reportedMap]);
+  const [isLoadingFeed, setIsLoadingFeed] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [busyPostMap, setBusyPostMap] = useState<Record<string, true>>({});
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const totalPosts = useMemo(() => posts.length, [posts]);
 
-  const handleSubmit = (): void => {
-    const cleaned = text.trim();
-    if (!cleaned) return;
+  const markPostBusy = (postId: string, isBusy: boolean): void => {
+    setBusyPostMap((prev) => {
+      if (isBusy) {
+        return { ...prev, [postId]: true };
+      }
 
-    const nextPost: Post = {
-      id: crypto.randomUUID(),
-      text: cleaned,
-      mood,
-      createdAt: Date.now(),
-      reports: 0,
-      reactions: { hug: 0, semangat: 0, gakSendiri: 0, izin: 0 },
-    };
-
-    setPosts((prev) => [nextPost, ...prev]);
-    setText("");
-    setMood("random");
+      const next = { ...prev };
+      delete next[postId];
+      return next;
+    });
   };
 
-  const handleReaction = (postId: string, reaction: ReactionKey): void => {
+  const loadFeed = async (): Promise<void> => {
+    setIsLoadingFeed(true);
+
+    try {
+      const response = await fetch("/api/posts", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, "Feed gagal dimuat."));
+      }
+
+      const payload = (await response.json()) as FeedResponse;
+
+      setPosts(Array.isArray(payload.posts) ? payload.posts : []);
+      setReactedMap(payload.reactedMap ?? {});
+      setReportedMap(payload.reportedMap ?? {});
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Feed gagal dimuat.");
+    } finally {
+      setIsLoadingFeed(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadFeed();
+  }, []);
+
+  const handleSubmit = async (): Promise<void> => {
+    const cleanedText = text.trim();
+
+    if (!cleanedText || isSubmitting || !isMood(mood)) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/posts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: cleanedText,
+          mood,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, "Curhat gagal dikirim."));
+      }
+
+      const payload = (await response.json()) as { post: Post };
+
+      setPosts((prev) => [payload.post, ...prev]);
+      setText("");
+      setMood("random");
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Curhat gagal dikirim.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReaction = async (postId: string, reaction: ReactionKey): Promise<void> => {
+    if (busyPostMap[postId]) return;
+
     const previous = reactedMap[postId];
     if (previous === reaction) return;
 
-    setPosts((prev) =>
-      prev.map((post) => {
-        if (post.id !== postId) return post;
+    markPostBusy(postId, true);
 
-        const nextReactions = { ...post.reactions };
+    try {
+      const response = await fetch(`/api/posts/${postId}/reaction`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ reaction }),
+      });
 
-        if (previous) {
-          nextReactions[previous] = Math.max(0, nextReactions[previous] - 1);
-        }
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, "Reaction belum masuk."));
+      }
 
-        nextReactions[reaction] = nextReactions[reaction] + 1;
+      const payload = (await response.json()) as {
+        postId: string;
+        selectedReaction: ReactionKey;
+        reactions: Post["reactions"];
+      };
 
-        return {
-          ...post,
-          reactions: nextReactions,
-        };
-      }),
-    );
+      setReactedMap((prev) => ({
+        ...prev,
+        [payload.postId]: payload.selectedReaction,
+      }));
 
-    setReactedMap((prev) => ({ ...prev, [postId]: reaction }));
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === payload.postId
+            ? {
+                ...post,
+                reactions: payload.reactions,
+              }
+            : post,
+        ),
+      );
+
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Reaction belum masuk.");
+    } finally {
+      markPostBusy(postId, false);
+    }
   };
 
-  const handleReport = (postId: string): void => {
-    if (reportedMap[postId]) return;
+  const handleReport = async (postId: string): Promise<void> => {
+    if (busyPostMap[postId] || reportedMap[postId]) return;
 
-    setPosts((prev) =>
-      prev.map((post) =>
-        post.id === postId ? { ...post, reports: post.reports + 1 } : post,
-      ),
-    );
+    markPostBusy(postId, true);
 
-    setReportedMap((prev) => ({ ...prev, [postId]: true }));
+    try {
+      const response = await fetch(`/api/posts/${postId}/report`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, "Laporan gagal dikirim."));
+      }
+
+      const payload = (await response.json()) as {
+        postId: string;
+        reported: boolean;
+        reports: number;
+      };
+
+      if (payload.reported) {
+        setReportedMap((prev) => ({ ...prev, [payload.postId]: true }));
+      }
+
+      setPosts((prev) =>
+        prev.map((post) =>
+          post.id === payload.postId
+            ? {
+                ...post,
+                reports: payload.reports,
+              }
+            : post,
+        ),
+      );
+
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Laporan gagal dikirim.");
+    } finally {
+      markPostBusy(postId, false);
+    }
   };
 
   return (
@@ -266,8 +266,8 @@ export function HubClient() {
       <div className="hub-stack">
         <div id="composer" className="panel composer-panel">
           <div className="panel-head">
-            <p className="eyebrow">Anonymous post {icon.write}</p>
-            <h2 className="section-title">{icon.write} Tumpahin unek-unek kamu</h2>
+            <p className="eyebrow">Mode anonim on {icon.write}</p>
+            <h2 className="section-title">{icon.write} Tumpahin unek-unek, biar kepala enggak ngebul</h2>
           </div>
 
           <textarea
@@ -276,11 +276,11 @@ export function HubClient() {
             value={text}
             onChange={(event) => setText(event.target.value)}
             maxLength={420}
-            placeholder="Ceritain aja. Tidak ada nama, tidak ada penghakiman."
+            placeholder="Ceritain aja. Di sini aman, enggak ada sidang netizen."
           />
 
           <div className="mood-list">
-            {(Object.keys(moodLabel) as Mood[]).map((value) => (
+            {moodValues.map((value) => (
               <button
                 key={value}
                 type="button"
@@ -294,8 +294,13 @@ export function HubClient() {
 
           <div className="composer-foot">
             <span className="char-counter">{text.length}/420</span>
-            <button className="cta-button composer-submit" type="button" onClick={handleSubmit}>
-              {icon.rocket} Kirim curhat
+            <button
+              className="cta-button composer-submit"
+              type="button"
+              onClick={handleSubmit}
+              disabled={isSubmitting || text.trim().length === 0}
+            >
+              {isSubmitting ? `${icon.rocket} Lagi ngirim...` : `${icon.rocket} Lempar curhat`}
             </button>
           </div>
         </div>
@@ -303,63 +308,68 @@ export function HubClient() {
         <div className="panel compact-info">
           <p className="eyebrow">Info singkat {icon.chart}</p>
           <p className="subtitle compact-copy">
-            {totalPosts} curhat hari ini. Kamu punya 1 reaction aktif per cerita,
-            tapi bisa diganti kapan saja.
+            {totalPosts} curhat masuk hari ini. React sesukamu,
+            kalau berubah pikiran tinggal ganti aja.
           </p>
           <p className="help-banner compact-help">
-            {icon.support} Jika lagi krisis, langsung hubungi layanan darurat atau
-            orang terdekat yang kamu percaya.
+            {icon.support} Kalau lagi krisis, jangan dipendem sendiri. Langsung hubungi
+            layanan darurat atau orang terdekat yang paling kamu percaya.
           </p>
+          {errorMessage ? <p className="inline-error">{errorMessage}</p> : null}
         </div>
 
         <div className="panel feed-panel">
           <div className="panel-head">
-            <p className="eyebrow">Feed cerita {icon.feed}</p>
-            <h2 className="section-title">{icon.megaphone} Cerita terbaru</h2>
-            <p className="subtitle">Dukungan cepat, tanpa drama.</p>
+            <p className="eyebrow">Feed drama warga {icon.feed}</p>
+            <h2 className="section-title">{icon.megaphone} Cerita terbaru kaum pejuang</h2>
+            <p className="subtitle">Baca, kasih react, lanjut healing tipis-tipis.</p>
           </div>
 
           <div className="feed">
-            {posts.map((post) => {
-              const reacted = reactedMap[post.id];
-              const reported = Boolean(reportedMap[post.id]);
+            {isLoadingFeed ? <p className="empty">Lagi ngambil curhatan terbaru...</p> : null}
 
-              return (
-                <article key={post.id} className="post-card">
-                  <div className="post-head">
-                    <span className="meta-chip">{moodLabel[post.mood]}</span>
-                    <span className="post-time">{formatTime(post.createdAt)}</span>
-                  </div>
+            {!isLoadingFeed &&
+              posts.map((post) => {
+                const reacted = reactedMap[post.id];
+                const reported = Boolean(reportedMap[post.id]);
+                const isBusy = Boolean(busyPostMap[post.id]);
 
-                  <p className="post-text">{post.text}</p>
+                return (
+                  <article key={post.id} className="post-card">
+                    <div className="post-head">
+                      <span className="meta-chip">{moodLabel[post.mood]}</span>
+                      <span className="post-time">{formatTime(post.createdAt)}</span>
+                    </div>
 
-                  <div className="reaction-list">
-                    {reactionKeys.map((reaction) => (
+                    <p className="post-text">{post.text}</p>
+
+                    <div className="reaction-list">
+                      {reactionValues.map((reaction) => (
+                        <button
+                          key={reaction}
+                          className={`reaction-button${reacted === reaction ? " is-selected" : ""}`}
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => handleReaction(post.id, reaction)}
+                        >
+                          {reactionLabel[reaction]} ({post.reactions[reaction]})
+                        </button>
+                      ))}
                       <button
-                        key={reaction}
-                        className={`reaction-button${reacted === reaction ? " is-selected" : ""}`}
+                        className={`reaction-button${reported ? " is-selected" : ""}`}
                         type="button"
-                        onClick={() => handleReaction(post.id, reaction)}
+                        disabled={reported || isBusy}
+                        onClick={() => handleReport(post.id)}
                       >
-                        {reactionLabel[reaction]} ({post.reactions[reaction]})
+                        {icon.report} {reported ? "Udah dilapor" : "Laporin"} ({post.reports})
                       </button>
-                    ))}
-                    <button
-                      className={`reaction-button${reported ? " is-selected" : ""}`}
-                      type="button"
-                      disabled={reported}
-                      onClick={() => handleReport(post.id)}
-                    >
-                      {icon.report} {reported ? "Reported" : "Report"} ({post.reports})
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
-            {posts.length === 0 ? (
-              <p className="empty">
-                Belum ada curhat. Mau jadi yang pertama ngeluh hari ini?
-              </p>
+                    </div>
+                  </article>
+                );
+              })}
+
+            {!isLoadingFeed && posts.length === 0 ? (
+              <p className="empty">Belum ada curhat. Mau jadi pembuka keluh kesah hari ini?</p>
             ) : null}
           </div>
         </div>

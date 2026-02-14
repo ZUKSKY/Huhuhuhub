@@ -21,21 +21,21 @@ export default function Home() {
         </Link>
 
         <nav className="topnav">
-          <Link href="/journal">{icon.journal} Journal</Link>
-          <Link href="/rules">{icon.shield} Rules</Link>
+          <Link href="/journal">{icon.journal} Jurnal Mood</Link>
+          <Link href="/rules">{icon.shield} Aturan Main</Link>
         </nav>
       </header>
 
       <section className="hero">
         <div className="hero-copy">
-          <p className="eyebrow">Anonymous vent space {icon.sparkle}</p>
-          <h1>{icon.heart} Tempat aman buat bilang, "hari ini ngeselin banget."</h1>
+          <p className="eyebrow">Tempat drama legal {icon.sparkle}</p>
+          <h1>{icon.heart} Tempat aman buat bilang, "ya ampun, hari ini kok begini banget."</h1>
           <p className="subtitle">
-            Curhat anonim, dapat dukungan, lalu lanjut hidup pelan-pelan.
-            Ngeluh dulu, lega kemudian
+            Curhat anonim tanpa takut di-judge. Ngeluh dulu bentar, ketawa tipis,
+            lalu lanjut jalan pelan-pelan.
           </p>
           <a href="#composer" className="cta-button">
-            {icon.write} Tumpahin unek-unek
+            {icon.write} Gas curhat sekarang
           </a>
         </div>
         <div className="hero-sticker" aria-hidden="true">
